@@ -54,18 +54,8 @@ async def handle_photo(message: Message, bot: Bot):
         # Анализируем переписку
         analysis_result = await analyze_conversation(conversation_text)
 
-        # Формируем ответ
-        response = (
-            "✅ Анализ завершён!\n\n"
-            f"📊 **Контекст:**\n{analysis_result['analysis']}\n\n"
-            f"🎭 **Рекомендуемый тон:** {analysis_result['tone']}\n\n"
-            "💬 **Варианты ответов:**\n\n"
-        )
-
-        for i, suggestion in enumerate(analysis_result['suggestions'], 1):
-            response += f"{i}. {suggestion}\n\n"
-
-        await processing_msg.edit_text(response, parse_mode="Markdown")
+        # Отправляем результат (уже отформатирован)
+        await processing_msg.edit_text(analysis_result)
         logger.info(f"Анализ отправлен пользователю {message.from_user.id}")
 
     except Exception as e:

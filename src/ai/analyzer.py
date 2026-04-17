@@ -1,79 +1,81 @@
 """Conversation analysis module"""
 
-import anthropic
+from anthropic import AsyncAnthropic
 from loguru import logger
 
 from src.config import ANTHROPIC_API_KEY
 
+client = AsyncAnthropic(api_key=ANTHROPIC_API_KEY)
 
-async def analyze_conversation(conversation_text: str) -> dict:
+SYSTEM_PROMPT = """Ты опытный психолог и эксперт по межличностной коммуникации.
+Твоя задача — анализировать текстовые переписки и помогать пользователю понять:
+- эмоциональный тон собеседника
+- скрытые намерения и подтекст
+- подходящие варианты ответа
+
+Отвечай структурированно, по делу, без лишних объяснений.
+Предлагай 5 вариантов ответа с разными подходами."""
+
+USER_PROMPT_TEMPLATE = """Проанализируй эту переписку:
+
+{text}
+
+Дай структурированный анализ в таком формате:
+
+📊 Тон: [один из: нейтральный / позитивный / агрессивный / обиженный / флиртующий / холодный]
+💡 Что имел в виду: [2-3 предложения краткого объяснения]
+
+💬 Варианты ответа:
+
+1. [вариант — спокойный/нейтральный]
+2. [вариант — тёплый/сближающий]
+3. [вариант — прямой/честный]
+4. [вариант — с юмором или альтернативный подход]
+5. [вариант — уточняющий вопрос]
+
+Формат должен быть точно таким."""
+
+
+async def analyze_conversation(conversation_text: str) -> str:
     """
-    Анализирует текст переписки и предлагает варианты ответов.
+    Анализирует текст переписки через Claude API.
 
     Args:
-        conversation_text: Текст переписки в формате "Имя: текст"
+        conversation_text: Текст переписки для анализа
 
     Returns:
-        dict с ключами:
-            - analysis: str - анализ контекста и тона
-            - suggestions: list[str] - 3 варианта ответов
-            - tone: str - рекомендуемый тон общения
+        str: Отформатированный текст анализа с эмодзи
+
+    Raises:
+        Exception: При ошибках API или обработки
     """
     try:
-        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+        logger.info("Анализ переписки через Claude Haiku...")
 
-        logger.info("Анализ переписки через Claude...")
-
-        message = client.messages.create(
-            model="claude-sonnet-4-5",
-            max_tokens=1500,
+        message = await client.messages.create(
+            model="claude-haiku-4-5",
+            max_tokens=1024,
+            system=SYSTEM_PROMPT,
             messages=[
                 {
                     "role": "user",
-                    "content": (
-                        f"Проанализируй эту переписку и предложи 3 варианта ответа.\n\n"
-                        f"Переписка:\n{conversation_text}\n\n"
-                        f"Верни ответ в формате JSON:\n"
-                        f"{{\n"
-                        f'  "analysis": "краткий анализ контекста и отношений",\n'
-                        f'  "tone": "рекомендуемый тон (формальный/дружеский/нейтральный)",\n'
-                        f'  "suggestions": [\n'
-                        f'    "вариант ответа 1",\n'
-                        f'    "вариант ответа 2",\n'
-                        f'    "вариант ответа 3"\n'
-                        f'  ]\n'
-                        f"}}"
-                    )
+                    "content": USER_PROMPT_TEMPLATE.format(text=conversation_text)
                 }
-            ],
+            ]
         )
 
         response_text = message.content[0].text.strip()
-        logger.info(f"Получен анализ: {response_text[:100]}...")
 
-        # Парсим JSON из ответа
-        import json
+        logger.info(
+            f"Анализ завершён, токены: input={message.usage.input_tokens}, "
+            f"output={message.usage.output_tokens}"
+        )
 
-        # Ищем JSON в ответе (может быть обёрнут в markdown)
-        if "```json" in response_text:
-            json_start = response_text.find("```json") + 7
-            json_end = response_text.find("```", json_start)
-            response_text = response_text[json_start:json_end].strip()
-        elif "```" in response_text:
-            json_start = response_text.find("```") + 3
-            json_end = response_text.find("```", json_start)
-            response_text = response_text[json_start:json_end].strip()
+        # Форматируем ответ с заголовком
+        formatted_response = f"🧠 Анализ переписки\n\n{response_text}"
 
-        result = json.loads(response_text)
+        return formatted_response
 
-        return result
-
-    except anthropic.APIError as e:
-        logger.error(f"Ошибка API Claude: {e}")
-        raise
-    except json.JSONDecodeError as e:
-        logger.error(f"Ошибка парсинга JSON ответа: {e}")
-        raise ValueError("Не удалось разобрать ответ от AI")
     except Exception as e:
         logger.error(f"Ошибка при анализе переписки: {e}")
         raise
