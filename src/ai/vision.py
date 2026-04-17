@@ -1,87 +1,83 @@
-"""Vision module for extracting text from conversation screenshots"""
+"""Vision: extract conversation text from screenshots via claude CLI"""
 
-import base64
-import anthropic
+import asyncio
+import subprocess
+import tempfile
+import os
 from loguru import logger
-
-from src.config import ANTHROPIC_API_KEY
 
 
 async def extract_text_from_image(image_bytes: bytes) -> str:
     """
-    Извлекает текст переписки из скриншота.
+    Извлекает текст переписки из скриншота через claude CLI.
 
     Args:
         image_bytes: Байты изображения
 
     Returns:
-        Извлечённый текст в формате "Имя: текст" или пустая строка, если переписка не найдена
+        Извлечённый текст в формате "Имя: текст"
 
     Raises:
         ValueError: Если на изображении нет переписки
     """
+    # Определяем расширение по сигнатуре
+    if image_bytes[:4] == b'\x89PNG':
+        ext = '.png'
+    elif image_bytes[:2] == b'\xff\xd8':
+        ext = '.jpg'
+    elif b'WEBP' in image_bytes[:12]:
+        ext = '.webp'
+    else:
+        ext = '.jpg'
+
+    # Сохраняем во временный файл
+    with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp:
+        tmp.write(image_bytes)
+        tmp_path = tmp.name
+
+    logger.info(f"Отправка изображения в claude CLI ({len(image_bytes)} байт, {tmp_path})")
+
     try:
-        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
-
-        # Кодируем изображение в base64
-        image_b64 = base64.b64encode(image_bytes).decode('utf-8')
-
-        # Определяем тип изображения (простая эвристика по первым байтам)
-        if image_bytes.startswith(b'\x89PNG'):
-            media_type = "image/png"
-        elif image_bytes.startswith(b'\xff\xd8\xff'):
-            media_type = "image/jpeg"
-        elif image_bytes.startswith(b'WEBP'):
-            media_type = "image/webp"
-        else:
-            # По умолчанию предполагаем JPEG
-            media_type = "image/jpeg"
-
-        logger.info(f"Отправка изображения в Claude Vision (размер: {len(image_bytes)} байт)")
-
-        message = client.messages.create(
-            model="claude-haiku-4-5",
-            max_tokens=2000,
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "image",
-                            "source": {
-                                "type": "base64",
-                                "media_type": media_type,
-                                "data": image_b64,
-                            },
-                        },
-                        {
-                            "type": "text",
-                            "text": (
-                                "Извлеки текст переписки из этого скриншота. "
-                                "Верни только диалог в формате:\n"
-                                "Имя1: текст сообщения\n"
-                                "Имя2: текст сообщения\n\n"
-                                "Если это не скриншот переписки (мессенджера), верни слово NONE."
-                            )
-                        }
-                    ],
-                }
-            ],
+        prompt = (
+            f"Прочитай файл {tmp_path} — это скриншот переписки из мессенджера. "
+            "Извлеки весь диалог в формате:\n"
+            "Имя1: текст сообщения\n"
+            "Имя2: текст сообщения\n\n"
+            "Если это не скриншот переписки — верни слово NONE. "
+            "Верни только диалог, без пояснений."
         )
 
-        extracted_text = message.content[0].text.strip()
+        result = await asyncio.wait_for(
+            asyncio.get_event_loop().run_in_executor(
+                None,
+                lambda: subprocess.run(
+                    ['claude', '-p', prompt, '--output-format', 'text',
+                     '--dangerously-skip-permissions'],
+                    capture_output=True, text=True, timeout=60
+                )
+            ),
+            timeout=65.0
+        )
 
-        logger.info(f"Извлечённый текст: {extracted_text[:100]}...")
+        if result.returncode != 0:
+            logger.error(f"claude CLI error: {result.stderr[:200]}")
+            raise Exception(f"claude CLI failed: {result.stderr[:200]}")
 
-        # Проверяем, является ли это скриншотом переписки
-        if extracted_text == "NONE" or not extracted_text:
+        extracted = result.stdout.strip()
+        logger.info(f"Извлечённый текст: {extracted[:100]}...")
+
+        if extracted.upper() == "NONE" or not extracted:
             raise ValueError("На изображении не обнаружена переписка")
 
-        return extracted_text
+        return extracted
 
-    except anthropic.APIError as e:
-        logger.error(f"Ошибка API Claude: {e}")
-        raise
+    except asyncio.TimeoutError:
+        raise Exception("Timeout: claude CLI не ответил вовремя")
     except Exception as e:
-        logger.error(f"Ошибка при извлечении текста из изображения: {e}")
+        logger.error(f"Ошибка извлечения текста: {e}")
         raise
+    finally:
+        try:
+            os.unlink(tmp_path)
+        except Exception:
+            pass

@@ -1,89 +1,62 @@
-"""Conversation analysis module"""
+"""Conversation analysis via claude CLI (no API key required)"""
 
 import asyncio
-from anthropic import AsyncAnthropic
+import subprocess
 from loguru import logger
 
-from src.config import ANTHROPIC_API_KEY
-
-client = AsyncAnthropic(api_key=ANTHROPIC_API_KEY, timeout=30.0)
-
 SYSTEM_PROMPT = """Ты опытный психолог и эксперт по межличностной коммуникации.
-Твоя задача — анализировать текстовые переписки и помогать пользователю понять:
-- эмоциональный тон собеседника
-- скрытые намерения и подтекст
-- подходящие варианты ответа
-
-Отвечай структурированно, по делу, без лишних объяснений.
-Предлагай 5 вариантов ответа с разными подходами."""
+Анализируй переписки: тон, подтекст, варианты ответа.
+Отвечай структурированно, по делу."""
 
 USER_PROMPT_TEMPLATE = """Проанализируй эту переписку:
 
 {text}
 
-Дай структурированный анализ в таком формате:
+Дай анализ строго в таком формате:
 
-📊 Тон: [один из: нейтральный / позитивный / агрессивный / обиженный / флиртующий / холодный]
-💡 Что имел в виду: [2-3 предложения краткого объяснения]
+📊 Тон: [нейтральный / позитивный / агрессивный / обиженный / флиртующий / холодный]
+💡 Что имел в виду: [2-3 предложения]
 
 💬 Варианты ответа:
 
-1. [вариант — спокойный/нейтральный]
-2. [вариант — тёплый/сближающий]
-3. [вариант — прямой/честный]
-4. [вариант — с юмором или альтернативный подход]
-5. [вариант — уточняющий вопрос]
-
-Формат должен быть точно таким."""
+1. [спокойный/нейтральный]
+2. [тёплый/сближающий]
+3. [прямой/честный]
+4. [с юмором или альтернативный]
+5. [уточняющий вопрос]"""
 
 
 async def analyze_conversation(conversation_text: str) -> str:
-    """
-    Анализирует текст переписки через Claude API.
+    """Анализирует текст переписки через claude CLI."""
+    prompt = USER_PROMPT_TEMPLATE.format(text=conversation_text)
+    full_prompt = f"{SYSTEM_PROMPT}\n\n{prompt}"
 
-    Args:
-        conversation_text: Текст переписки для анализа
+    logger.info("Анализ переписки через claude CLI...")
 
-    Returns:
-        str: Отформатированный текст анализа с эмодзи
-
-    Raises:
-        Exception: При ошибках API или обработки
-    """
     try:
-        logger.info("Анализ переписки через Claude Haiku...")
-
-        # Оборачиваем в asyncio.wait_for для дополнительной защиты от зависаний
-        message = await asyncio.wait_for(
-            client.messages.create(
-                model="claude-haiku-4-5",
-                max_tokens=1024,
-                system=SYSTEM_PROMPT,
-                messages=[
-                    {
-                        "role": "user",
-                        "content": USER_PROMPT_TEMPLATE.format(text=conversation_text)
-                    }
-                ]
+        result = await asyncio.wait_for(
+            asyncio.get_event_loop().run_in_executor(
+                None,
+                lambda: subprocess.run(
+                    ['claude', '-p', full_prompt, '--output-format', 'text',
+                     '--dangerously-skip-permissions'],
+                    capture_output=True, text=True, timeout=60
+                )
             ),
-            timeout=35.0  # Чуть больше чем timeout клиента
+            timeout=65.0
         )
 
-        response_text = message.content[0].text.strip()
+        if result.returncode != 0:
+            logger.error(f"claude CLI error: {result.stderr[:200]}")
+            raise Exception(f"claude CLI failed: {result.stderr[:200]}")
 
-        logger.info(
-            f"Анализ завершён, токены: input={message.usage.input_tokens}, "
-            f"output={message.usage.output_tokens}"
-        )
+        response = result.stdout.strip()
+        logger.info(f"Анализ завершён ({len(response)} символов)")
 
-        # Форматируем ответ с заголовком
-        formatted_response = f"🧠 Анализ переписки\n\n{response_text}"
-
-        return formatted_response
+        return f"🧠 Анализ переписки\n\n{response}"
 
     except asyncio.TimeoutError:
-        logger.error("Превышено время ожидания ответа от Claude API")
-        raise Exception("Timeout: API не ответил вовремя")
+        raise Exception("Timeout: claude CLI не ответил вовремя")
     except Exception as e:
-        logger.error(f"Ошибка при анализе переписки: {e}")
+        logger.error(f"Ошибка анализа: {e}")
         raise
