@@ -116,7 +116,17 @@ async def handle_photo(message: Message, bot: Bot):
 
     except Exception as e:
         logger.error(f"Ошибка при обработке фото: {e}")
-        await message.answer(
-            "❌ Произошла ошибка при обработке изображения.\n"
-            "Попробуй ещё раз или обратись в поддержку."
-        )
+
+        # Определяем тип ошибки для более информативного сообщения
+        error_message = "Что-то пошло не так, попробуй ещё раз 🔄"
+
+        # Проверяем тип ошибки
+        error_str = str(e).lower()
+        if "timeout" in error_str or "timed out" in error_str:
+            error_message = "⏱️ Превышено время ожидания. Попробуй ещё раз или отправь скриншот меньшего размера."
+        elif "rate limit" in error_str or "429" in error_str:
+            error_message = "⚠️ Слишком много запросов. Подожди минуту и попробуй снова."
+        elif "api" in error_str or "connection" in error_str:
+            error_message = "🔌 Проблема с подключением. Попробуй через минуту."
+
+        await message.answer(error_message)

@@ -1,11 +1,12 @@
 """Conversation analysis module"""
 
+import asyncio
 from anthropic import AsyncAnthropic
 from loguru import logger
 
 from src.config import ANTHROPIC_API_KEY
 
-client = AsyncAnthropic(api_key=ANTHROPIC_API_KEY)
+client = AsyncAnthropic(api_key=ANTHROPIC_API_KEY, timeout=30.0)
 
 SYSTEM_PROMPT = """Ты опытный психолог и эксперт по межличностной коммуникации.
 Твоя задача — анализировать текстовые переписки и помогать пользователю понять:
@@ -52,16 +53,20 @@ async def analyze_conversation(conversation_text: str) -> str:
     try:
         logger.info("Анализ переписки через Claude Haiku...")
 
-        message = await client.messages.create(
-            model="claude-haiku-4-5",
-            max_tokens=1024,
-            system=SYSTEM_PROMPT,
-            messages=[
-                {
-                    "role": "user",
-                    "content": USER_PROMPT_TEMPLATE.format(text=conversation_text)
-                }
-            ]
+        # Оборачиваем в asyncio.wait_for для дополнительной защиты от зависаний
+        message = await asyncio.wait_for(
+            client.messages.create(
+                model="claude-haiku-4-5",
+                max_tokens=1024,
+                system=SYSTEM_PROMPT,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": USER_PROMPT_TEMPLATE.format(text=conversation_text)
+                    }
+                ]
+            ),
+            timeout=35.0  # Чуть больше чем timeout клиента
         )
 
         response_text = message.content[0].text.strip()
@@ -76,6 +81,9 @@ async def analyze_conversation(conversation_text: str) -> str:
 
         return formatted_response
 
+    except asyncio.TimeoutError:
+        logger.error("Превышено время ожидания ответа от Claude API")
+        raise Exception("Timeout: API не ответил вовремя")
     except Exception as e:
         logger.error(f"Ошибка при анализе переписки: {e}")
         raise
