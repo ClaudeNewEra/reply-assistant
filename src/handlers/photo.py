@@ -1,132 +1,41 @@
-"""Photo handler for analyzing conversation screenshots"""
+"""Photo handler — extract text, cache, show mode selection."""
 
-from datetime import datetime
 from aiogram import Router, Bot
 from aiogram.types import Message
 from loguru import logger
 
 from src.ai.vision import extract_text_from_image
-from src.ai.analyzer import analyze_conversation
-from src.config import FREE_ANALYSES_LIMIT
-from src.db.database import AsyncSessionLocal
-from src.db.crud import get_or_create_user, increment_usage, create_analysis
+from src.modes import build_mode_keyboard
+from src.handlers.mode_callback import store_pending
 
 router = Router()
 
 
 @router.message(lambda message: message.photo)
 async def handle_photo(message: Message, bot: Bot):
-    """
-    Обрабатывает фото со скриншотами переписки.
+    processing_msg = await message.answer("🔍 Читаю скриншот...")
 
-    Args:
-        message: Сообщение с фото
-        bot: Инстанс бота для скачивания файла
-    """
     try:
-        async with AsyncSessionLocal() as session:
-            # Получаем или создаём пользователя
-            user = await get_or_create_user(
-                session,
-                telegram_id=message.from_user.id,
-                username=message.from_user.username
-            )
+        photo = message.photo[-1]
+        file = await bot.get_file(photo.file_id)
+        image_bytes = await bot.download_file(file.file_path)
+        image_data = image_bytes.read()
 
-            # Проверяем актуальность премиум-подписки
-            has_active_premium = user.is_premium and user.premium_until and datetime.now() < user.premium_until
+        conversation_text = await extract_text_from_image(image_data)
 
-            # Проверяем лимит бесплатных анализов
-            if not has_active_premium and user.free_analyses_used >= FREE_ANALYSES_LIMIT:
-                await message.answer(
-                    "🔒 Бесплатные анализы закончились\n\n"
-                    f"Ты использовал(а) {FREE_ANALYSES_LIMIT} бесплатных анализа.\n\n"
-                    "Чтобы продолжить — оформи подписку:\n"
-                    "⭐ 199 ₽/месяц — безлимитные анализы\n\n"
-                    "👉 /subscribe — оформить подписку"
-                )
-                logger.info(
-                    f"Пользователь {user.telegram_id} исчерпал лимит "
-                    f"({user.free_analyses_used}/{FREE_ANALYSES_LIMIT})"
-                )
-                return
+        store_pending(message.from_user.id, conversation_text, "image", message.message_id)
 
-            # Отправляем сообщение о начале обработки
-            processing_msg = await message.answer("🔍 Анализирую скриншот...")
+        await processing_msg.edit_text(
+            "📸 Переписка распознана. Выбери режим анализа:",
+            reply_markup=build_mode_keyboard(),
+        )
+        logger.info(f"Скриншот от {message.from_user.id} обработан, ожидание режима")
 
-            # Получаем самое большое фото (лучшее качество)
-            photo = message.photo[-1]
-
-            logger.info(
-                f"Получено фото от пользователя {user.telegram_id}, "
-                f"использовано анализов: {user.free_analyses_used}/{FREE_ANALYSES_LIMIT}"
-            )
-
-            # Скачиваем файл
-            file = await bot.get_file(photo.file_id)
-            image_bytes = await bot.download_file(file.file_path)
-
-            # Читаем байты из BytesIO объекта
-            image_data = image_bytes.read()
-
-            logger.info(f"Фото скачано, размер: {len(image_data)} байт")
-
-            # Извлекаем текст из изображения
-            try:
-                conversation_text = await extract_text_from_image(image_data)
-            except ValueError as e:
-                # Это не скриншот переписки
-                await processing_msg.edit_text(
-                    "❌ Не вижу переписки на этом фото.\n\n"
-                    "Пожалуйста, отправь скриншот переписки из мессенджера "
-                    "(Telegram, WhatsApp, Instagram, VK и т.д.)"
-                )
-                return
-
-            logger.info("Текст успешно извлечён, отправляем на анализ")
-
-            # Анализируем переписку
-            analysis_result = await analyze_conversation(conversation_text)
-
-            # Создаём запись об анализе
-            await create_analysis(
-                session,
-                user=user,
-                analysis_type="image",
-                input_text="[фото переписки]"
-            )
-
-            # Инкрементируем счётчик использованных анализов (только для не-премиум)
-            if not has_active_premium:
-                await increment_usage(session, user)
-
-            # Отправляем результат
-            remaining = FREE_ANALYSES_LIMIT - user.free_analyses_used - 1
-            footer = ""
-            if not has_active_premium and remaining > 0:
-                footer = f"\n\n📊 Осталось бесплатных анализов: {remaining}"
-            elif not has_active_premium and remaining == 0:
-                footer = "\n\n⚠️ Это был твой последний бесплатный анализ. Используй /subscribe для продолжения."
-
-            await processing_msg.edit_text(analysis_result + footer)
-
-            logger.info(
-                f"Анализ завершён для пользователя {user.telegram_id}, "
-                f"осталось анализов: {remaining if remaining >= 0 else 0}"
-            )
-
+    except ValueError:
+        await processing_msg.edit_text(
+            "❌ Не вижу переписки на этом фото.\n\n"
+            "Отправь скриншот переписки из мессенджера (Telegram, WhatsApp, Instagram и т.д.)"
+        )
     except Exception as e:
         logger.error(f"Ошибка при обработке фото: {e}")
-
-        # Определяем тип ошибки для более информативного сообщения
-        error_message = "Что-то пошло не так, попробуй ещё раз 🔄"
-
-        # Проверяем тип ошибки
-        error_str = str(e).lower()
-        if "timeout" in error_str or "timed out" in error_str:
-            error_message = "⏱️ Превышено время ожидания. Попробуй ещё раз или отправь скриншот меньшего размера."
-        elif "rate limit" in error_str or "429" in error_str:
-            error_message = "⚠️ Слишком много запросов. Подожди минуту и попробуй снова."
-        elif "api" in error_str or "connection" in error_str:
-            error_message = "🔌 Проблема с подключением. Попробуй через минуту."
-
-        await message.answer(error_message)
+        await processing_msg.edit_text("Что-то пошло не так 🔄")

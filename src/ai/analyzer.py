@@ -6,30 +6,46 @@ from loguru import logger
 
 SYSTEM_PROMPT = """Ты опытный психолог и эксперт по межличностной коммуникации.
 Анализируй переписки: тон, подтекст, варианты ответа.
-Отвечай структурированно, по делу."""
+Отвечай структурированно, по делу.
+ВАЖНО: не используй markdown-форматирование. Никаких звёздочек (**), подчёркиваний (_), решёток (#). Только чистый текст и эмодзи."""
 
 USER_PROMPT_TEMPLATE = """Проанализируй эту переписку:
 
 {text}
 
-Дай анализ строго в таком формате:
+Дай анализ строго в таком формате (без звёздочек и markdown):
 
-📊 Тон: [нейтральный / позитивный / агрессивный / обиженный / флиртующий / холодный]
-💡 Что имел в виду: [2-3 предложения]
+📊 Тон: нейтральный / позитивный / агрессивный / обиженный / флиртующий / холодный
+💡 Что имел в виду: 2-3 предложения объяснения
 
 💬 Варианты ответа:
+{variant_instructions}
 
-1. [спокойный/нейтральный]
-2. [тёплый/сближающий]
-3. [прямой/честный]
-4. [с юмором или альтернативный]
-5. [уточняющий вопрос]"""
+Каждый вариант — готовая фраза в кавычках. Без заголовков в квадратных скобках."""
 
 
-async def analyze_conversation(conversation_text: str) -> str:
+DEFAULT_VARIANTS = (
+    "1. Спокойный, нейтральный\n"
+    "2. Тёплый, сближающий\n"
+    "3. Прямой, честный\n"
+    "4. С лёгким юмором\n"
+    "5. Уточняющий вопрос"
+)
+
+
+async def analyze_conversation(
+    conversation_text: str,
+    mode_prompt: str = "",
+    variant_instructions: str = "",
+) -> str:
     """Анализирует текст переписки через claude CLI."""
-    prompt = USER_PROMPT_TEMPLATE.format(text=conversation_text)
-    full_prompt = f"{SYSTEM_PROMPT}\n\n{prompt}"
+    mode_section = f"\n\n{mode_prompt}" if mode_prompt else ""
+    variants = variant_instructions or DEFAULT_VARIANTS
+    prompt = USER_PROMPT_TEMPLATE.format(
+        text=conversation_text,
+        variant_instructions=variants,
+    )
+    full_prompt = f"{SYSTEM_PROMPT}{mode_section}\n\n{prompt}"
 
     logger.info("Анализ переписки через claude CLI...")
 

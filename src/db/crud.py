@@ -33,6 +33,20 @@ async def increment_usage(session: AsyncSession, user: User) -> None:
     logger.debug(f"Пользователь {user.telegram_id} использовал {user.free_analyses_used} анализов")
 
 
+async def add_credits(session: AsyncSession, user: User, amount: int) -> None:
+    """Добавить кредиты (купленные анализы)"""
+    user.credits += amount
+    await session.commit()
+    logger.info(f"Пользователь {user.telegram_id} купил {amount} анализов, итого: {user.credits}")
+
+
+async def decrement_credits(session: AsyncSession, user: User) -> None:
+    """Использовать один кредит"""
+    if user.credits > 0:
+        user.credits -= 1
+        await session.commit()
+
+
 async def set_premium(session: AsyncSession, user: User, days: int) -> None:
     """Установить премиум-статус для пользователя на указанное количество дней"""
     premium_until = datetime.now() + timedelta(days=days)
@@ -74,3 +88,10 @@ async def get_user_by_telegram_id(session: AsyncSession, telegram_id: int) -> Us
     stmt = select(User).where(User.telegram_id == telegram_id)
     result = await session.execute(stmt)
     return result.scalar_one_or_none()
+
+
+async def set_voice_id(session: AsyncSession, user: User, voice_id: str | None) -> None:
+    """Сохранить или сбросить ElevenLabs voice_id."""
+    user.elevenlabs_voice_id = voice_id
+    await session.commit()
+    logger.info(f"Voice ID для {user.telegram_id}: {voice_id}")
