@@ -1,5 +1,6 @@
 """Text message handler for conversation analysis"""
 
+from datetime import datetime
 from aiogram import Router
 from aiogram.types import Message
 from loguru import logger
@@ -29,8 +30,11 @@ async def handle_text(message: Message):
                 username=message.from_user.username
             )
 
+            # Проверяем актуальность премиум-подписки
+            has_active_premium = user.is_premium and user.premium_until and datetime.now() < user.premium_until
+
             # Проверяем лимит бесплатных анализов
-            if not user.is_premium and user.free_analyses_used >= FREE_ANALYSES_LIMIT:
+            if not has_active_premium and user.free_analyses_used >= FREE_ANALYSES_LIMIT:
                 await message.answer(
                     "🔒 Бесплатные анализы закончились\n\n"
                     f"Ты использовал(а) {FREE_ANALYSES_LIMIT} бесплатных анализа.\n\n"
@@ -63,15 +67,16 @@ async def handle_text(message: Message):
                 input_text=message.text
             )
 
-            # Инкрементируем счётчик использованных анализов
-            await increment_usage(session, user)
+            # Инкрементируем счётчик использованных анализов (только для не-премиум)
+            if not has_active_premium:
+                await increment_usage(session, user)
 
             # Отправляем результат
             remaining = FREE_ANALYSES_LIMIT - user.free_analyses_used - 1
             footer = ""
-            if not user.is_premium and remaining > 0:
+            if not has_active_premium and remaining > 0:
                 footer = f"\n\n📊 Осталось бесплатных анализов: {remaining}"
-            elif not user.is_premium and remaining == 0:
+            elif not has_active_premium and remaining == 0:
                 footer = "\n\n⚠️ Это был твой последний бесплатный анализ. Используй /subscribe для продолжения."
 
             await processing_msg.edit_text(analysis_result + footer)

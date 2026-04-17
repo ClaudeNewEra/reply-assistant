@@ -1,9 +1,9 @@
 """Command handlers for the bot"""
 
 from datetime import datetime
-from aiogram import Router
+from aiogram import Router, Bot
 from aiogram.filters import Command
-from aiogram.types import Message
+from aiogram.types import Message, LabeledPrice
 
 from src.config import FREE_ANALYSES_LIMIT
 from src.db.database import AsyncSessionLocal
@@ -72,15 +72,13 @@ async def cmd_status(message: Message):
 
 
 @router.message(Command("subscribe"))
-async def cmd_subscribe(message: Message):
-    """Информация о подписке"""
-    await message.answer(
-        "⭐ Премиум подписка\n\n"
-        "💎 199 ₽/месяц\n\n"
-        "Что входит:\n"
-        "✅ Безлимитные анализы переписок\n"
-        "✅ Приоритетная обработка\n"
-        "✅ Доступ к новым функциям\n\n"
-        "🚀 Для оформления подписки свяжись с @acoustic\n\n"
-        "После оплаты активация произойдёт автоматически."
+async def cmd_subscribe(message: Message, bot: Bot):
+    """Оформление подписки через Telegram Stars"""
+    await bot.send_invoice(
+        chat_id=message.chat.id,
+        title='Подписка Reply Assistant',
+        description='Безлимитные AI-анализы переписки на 30 дней',
+        payload='premium_30d',
+        currency='XTR',  # Telegram Stars
+        prices=[LabeledPrice(label='30 дней', amount=100)]  # 100 Stars
     )

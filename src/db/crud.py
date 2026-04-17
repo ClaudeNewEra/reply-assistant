@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from loguru import logger
@@ -33,12 +33,13 @@ async def increment_usage(session: AsyncSession, user: User) -> None:
     logger.debug(f"Пользователь {user.telegram_id} использовал {user.free_analyses_used} анализов")
 
 
-async def set_premium(session: AsyncSession, user: User, premium_until: datetime | None) -> None:
-    """Установить премиум-статус для пользователя"""
-    user.is_premium = premium_until is not None and premium_until > datetime.now()
+async def set_premium(session: AsyncSession, user: User, days: int) -> None:
+    """Установить премиум-статус для пользователя на указанное количество дней"""
+    premium_until = datetime.now() + timedelta(days=days)
+    user.is_premium = True
     user.premium_until = premium_until
     await session.commit()
-    logger.info(f"Премиум статус для пользователя {user.telegram_id} обновлен: {user.is_premium} (до {premium_until})")
+    logger.info(f"Премиум статус для пользователя {user.telegram_id} активирован на {days} дней (до {premium_until.strftime('%d.%m.%Y')})")
 
 
 async def create_analysis(
@@ -66,3 +67,10 @@ async def get_user_analyses_count(session: AsyncSession, user: User) -> int:
     stmt = select(Analysis).where(Analysis.user_id == user.id)
     result = await session.execute(stmt)
     return len(result.scalars().all())
+
+
+async def get_user_by_telegram_id(session: AsyncSession, telegram_id: int) -> User | None:
+    """Получить пользователя по telegram_id"""
+    stmt = select(User).where(User.telegram_id == telegram_id)
+    result = await session.execute(stmt)
+    return result.scalar_one_or_none()
