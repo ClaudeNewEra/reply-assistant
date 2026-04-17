@@ -32,10 +32,11 @@ async def handle_text(message: Message):
             # Проверяем лимит бесплатных анализов
             if not user.is_premium and user.free_analyses_used >= FREE_ANALYSES_LIMIT:
                 await message.answer(
-                    "⚠️ Лимит бесплатных анализов исчерпан\n\n"
-                    f"Вы использовали {user.free_analyses_used} из {FREE_ANALYSES_LIMIT} бесплатных анализов.\n\n"
-                    "💎 Для продолжения нужна премиум-подписка.\n"
-                    "Используйте /premium для получения информации."
+                    "🔒 Бесплатные анализы закончились\n\n"
+                    f"Ты использовал(а) {FREE_ANALYSES_LIMIT} бесплатных анализа.\n\n"
+                    "Чтобы продолжить — оформи подписку:\n"
+                    "⭐ 199 ₽/месяц — безлимитные анализы\n\n"
+                    "👉 /subscribe — оформить подписку"
                 )
                 logger.info(
                     f"Пользователь {user.telegram_id} исчерпал лимит "
@@ -71,7 +72,7 @@ async def handle_text(message: Message):
             if not user.is_premium and remaining > 0:
                 footer = f"\n\n📊 Осталось бесплатных анализов: {remaining}"
             elif not user.is_premium and remaining == 0:
-                footer = "\n\n⚠️ Это был ваш последний бесплатный анализ. Используйте /premium для продолжения."
+                footer = "\n\n⚠️ Это был твой последний бесплатный анализ. Используй /subscribe для продолжения."
 
             await processing_msg.edit_text(analysis_result + footer)
 

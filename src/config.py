@@ -17,7 +17,7 @@ ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./data/bot.db")
 
 # Лимиты
-FREE_ANALYSES_LIMIT = int(os.getenv("FREE_ANALYSES_LIMIT", "5"))
+FREE_ANALYSES_LIMIT = int(os.getenv("FREE_ANALYSES_LIMIT", "3"))
 
 # Логирование
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
