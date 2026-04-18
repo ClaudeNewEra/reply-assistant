@@ -11,6 +11,7 @@ from src.config import FREE_ANALYSES_LIMIT
 from src.db.database import AsyncSessionLocal
 from src.db.crud import get_or_create_user, increment_usage, decrement_credits, create_analysis
 from src.modes import MODES
+from src.utils import notify_admin_error
 
 router = Router()
 
@@ -162,7 +163,8 @@ async def on_mode_selected(callback: CallbackQuery):
 
     except Exception as e:
         logger.error(f"Ошибка при анализе с режимом {mode_key}: {e}")
-        await callback.message.edit_text("Что-то пошло не так 🔄")
+        await notify_admin_error(callback.bot, f"on_mode_selected/{mode_key}", e, callback.from_user.id)
+        await callback.message.edit_text("Что-то пошло не так, уже разбираемся 🔄")
 
 
 @router.callback_query(lambda c: c.data and c.data.startswith("voice:v:"))
@@ -204,4 +206,5 @@ async def on_voice_variant(callback: CallbackQuery):
         )
     except Exception as e:
         logger.error(f"TTS failed for {user_id} variant {variant_num}: {e}")
-        await callback.message.answer(f"❌ Ошибка генерации: {str(e)[:150]}")
+        await notify_admin_error(callback.bot, f"on_voice_variant/{variant_num}", e, user_id)
+        await callback.message.answer("Не удалось сгенерировать голос, уже разбираемся 🔄")

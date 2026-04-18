@@ -10,6 +10,7 @@ from loguru import logger
 from src.config import GROQ_API_KEY
 from src.modes import build_mode_keyboard
 from src.handlers.mode_callback import store_pending
+from src.utils import notify_admin_error
 
 router = Router()
 
@@ -53,6 +54,11 @@ async def handle_voice(message: Message, bot: Bot):
     try:
         await bot.download_file(file.file_path, destination=tmp_path)
         text = await transcribe_voice(tmp_path)
+    except Exception as e:
+        logger.error(f"Ошибка распознавания голоса {message.from_user.id}: {e}")
+        await notify_admin_error(bot, "handle_voice/transcribe", e, message.from_user.id)
+        await processing_msg.edit_text("Не удалось распознать речь. Попробуй ещё раз или отправь текст.")
+        return
     finally:
         try:
             os.unlink(tmp_path)
@@ -60,9 +66,7 @@ async def handle_voice(message: Message, bot: Bot):
             pass
 
     if not text:
-        await processing_msg.edit_text(
-            "❌ Не удалось распознать речь. Попробуй ещё раз или отправь текст."
-        )
+        await processing_msg.edit_text("Не удалось распознать речь. Попробуй ещё раз или отправь текст.")
         return
 
     logger.info(f"Голосовое от {message.from_user.id}: {text[:80]}...")

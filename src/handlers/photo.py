@@ -7,6 +7,7 @@ from loguru import logger
 from src.ai.vision import extract_text_from_image
 from src.modes import build_mode_keyboard
 from src.handlers.mode_callback import store_pending
+from src.utils import notify_admin_error
 
 router = Router()
 
@@ -38,4 +39,5 @@ async def handle_photo(message: Message, bot: Bot):
         )
     except Exception as e:
         logger.error(f"Ошибка при обработке фото: {e}")
-        await processing_msg.edit_text("Что-то пошло не так 🔄")
+        await notify_admin_error(bot, "handle_photo", e, message.from_user.id)
+        await processing_msg.edit_text("Что-то пошло не так, уже разбираемся 🔄")
