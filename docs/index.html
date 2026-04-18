@@ -206,6 +206,9 @@
     .p-var.vis{opacity:1;transform:translateX(0);}
     .p-vnum{color:#8B7FFF;font-weight:700;margin-right:3px;}
 
+    .p-var { transition: opacity .2s ease, transform .2s ease; }
+    .pm { transition: opacity .25s ease, transform .25s ease; }
+
     .demo-play {
       position: absolute; inset: 0;
       display: flex; flex-direction:column;
@@ -213,6 +216,7 @@
       background: rgba(0,0,0,.55);
       backdrop-filter: blur(3px);
       cursor: pointer; z-index:10;
+      transition: opacity .3s;
     }
     .demo-ring {
       width:54px; height:54px; border-radius:50%;
@@ -413,9 +417,10 @@
   const dc = document.getElementById('demo-chat');
   function dd(ms){ return new Promise(r=>setTimeout(r,ms)); }
 
-  function pm(text,type){
+  function pm(text,type,emoji){
     const el=document.createElement('div');
-    el.className='pm '+type; el.textContent=text; return el;
+    el.className='pm '+type;
+    el.textContent=text; return el;
   }
   function pt(){
     const el=document.createElement('div');
@@ -424,40 +429,88 @@
   }
   function pkb(){
     const el=document.createElement('div'); el.className='p-kb';
-    el.innerHTML=`<div class="p-kb-row"><button class="p-kb-btn" id="dfb">💕 Флирт</button><button class="p-kb-btn">❤️ Любовь</button></div><div class="p-kb-row"><button class="p-kb-btn">🤝 Дружба</button><button class="p-kb-btn">😂 Юмор</button></div>`;
+    el.innerHTML=`
+      <div class="p-kb-row">
+        <button class="p-kb-btn" id="dfb">💕 Флирт</button>
+        <button class="p-kb-btn">😂 Юмор</button>
+      </div>
+      <div class="p-kb-row">
+        <button class="p-kb-btn">🤝 Дружба</button>
+        <button class="p-kb-btn">💼 Дело</button>
+      </div>`;
     return el;
   }
-  function pv(n,t){
+  function pv(n,t,delay_extra){
     const el=document.createElement('div'); el.className='p-var';
     el.innerHTML=`<span class="p-vnum">${n}.</span>${t}`; return el;
   }
   function add(el){
     dc.appendChild(el); dc.scrollTop=dc.scrollHeight;
-    requestAnimationFrame(()=>setTimeout(()=>el.classList.add('vis'),30));
+    requestAnimationFrame(()=>setTimeout(()=>el.classList.add('vis'),20));
   }
 
   async function runDemo(){
+    document.getElementById('demo-play').style.opacity='0';
+    await dd(200);
     document.getElementById('demo-play').remove();
-    await dd(300);
-    add(pm('Слушай, ты как вообще?.. 🤔','in'));
-    await dd(900);
-    add(pm('📸 [скриншот переписки]','out'));
-    await dd(700);
-    const t1=pt(); add(t1); setTimeout(()=>t1.classList.add('vis'),30);
-    await dd(1200); t1.remove();
-    add(pm('🔍 Переписка прочитана. Выбери режим:','bot'));
-    await dd(350);
-    const kb=pkb(); add(kb); await dd(100);
-    requestAnimationFrame(()=>setTimeout(()=>kb.classList.add('vis'),30));
-    await dd(900);
-    const fb=document.getElementById('dfb'); if(fb) fb.classList.add('active');
+
+    // Incoming — жгучее сообщение
+    add(pm('Привет... ты обо мне думал? 👀','in'));
+    await dd(600);
+
+    // Пользователь в замешательстве — пауза
     await dd(500);
-    const t2=pt(); add(t2); setTimeout(()=>t2.classList.add('vis'),30);
-    await dd(1100); t2.remove();
-    add(pm('✨ Тёплый, открытый тон. Варианты:','bot'));
+
+    // Скидывает боту
+    add(pm('📸 переписка.jpg','out'));
+    await dd(400);
+
+    // Бот думает — быстро
+    const t1=pt(); add(t1); setTimeout(()=>t1.classList.add('vis'),20);
+    await dd(750); t1.remove();
+
+    add(pm('⚡ Готово! Она флиртует — явно. Выбери стиль:','bot'));
+    await dd(200);
+
+    // Клавиатура
+    const kb=pkb(); add(kb);
+    requestAnimationFrame(()=>setTimeout(()=>kb.classList.add('vis'),20));
+    await dd(600);
+
+    // Нажатие на Флирт
+    const fb=document.getElementById('dfb');
+    if(fb){ fb.style.transition='background .15s'; fb.classList.add('active'); }
     await dd(300);
-    const vs=['Всё отлично, когда слышу тебя 😊','Лучше — думаю о тебе 🌸','Кажется, ждал твоего вопроса 😏','Расскажи про себя сначала 😉','Зависит от того, кто спрашивает 🔥'];
-    for(let i=0;i<vs.length;i++){ await dd(320); add(pv(i+1,vs[i])); }
+
+    // Второй typing — ещё быстрее
+    const t2=pt(); add(t2); setTimeout(()=>t2.classList.add('vis'),20);
+    await dd(650); t2.remove();
+
+    add(pm('🔥 Вот 5 ответов — выбирай лучший:','bot'));
+    await dd(150);
+
+    // Варианты — быстрый каскад
+    const vs=[
+      ['Думал. Прямо сейчас 😏', '#a78bfa'],
+      ['Если честно — да 🙈','#6C63FF'],
+      ['А ты ждала этого? 🔥','#a78bfa'],
+      ['Что ты со мной делаешь... 💜','#6C63FF'],
+      ['Угадай 😈','#a78bfa'],
+    ];
+    for(let i=0;i<vs.length;i++){
+      await dd(210);
+      const el=document.createElement('div'); el.className='p-var';
+      el.innerHTML=`<span class="p-vnum" style="color:${vs[i][1]}">${i+1}.</span>${vs[i][0]}`;
+      add(el);
+    }
+
+    // Replay через 4 секунды
+    await dd(4000);
+    dc.innerHTML='';
+    const overlay=document.createElement('div');
+    overlay.className='demo-play'; overlay.id='demo-play'; overlay.onclick=runDemo;
+    overlay.innerHTML='<div class="demo-ring">▶</div><div class="demo-label">Ещё раз</div>';
+    document.getElementById('demo-wrap').appendChild(overlay);
   }
   </script>
 
