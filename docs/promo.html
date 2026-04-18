@@ -256,30 +256,44 @@ body{
 <script>
 const chat = document.getElementById('chat');
 const sub  = document.getElementById('sub');
-const synth = window.speechSynthesis;
-let voices = [];
 
-function loadVoices(){
-  voices = synth.getVoices();
-}
-loadVoices();
-if(synth.onvoiceschanged !== undefined) synth.onvoiceschanged = loadVoices;
+// Audio clips from ElevenLabs
+const AUDIO = {
+  hook1:  'audio/hook1.mp3',
+  hook2:  'audio/hook2.mp3',
+  scene3: 'audio/scene3.mp3',
+  scene4: 'audio/scene4.mp3',
+  scene5: 'audio/scene5.mp3',
+  scene6: 'audio/scene6.mp3',
+  scene7: 'audio/scene7.mp3',
+  scene8: 'audio/scene8.mp3',
+  scene9: 'audio/scene9.mp3',
+  cta:    'audio/cta.mp3',
+};
+
+const SUBTITLES = {
+  hook1:  'Получил сообщение и завис?!',
+  hook2:  'Не знаешь что ответить — слушай, я нашёл кое-что крутое.',
+  scene3: 'Смотри — приходит сообщение:',
+  scene4: 'И ты сидишь и не знаешь что написать.',
+  scene5: 'Просто скидываешь переписку в МозгПереписки AI — всё!',
+  scene6: 'Бот читает и спрашивает в каком стиле отвечать.',
+  scene7: 'Выбираешь — например, флирт!',
+  scene8: 'И бам — пять готовых ответов прямо в чате!',
+  scene9: 'Нажимаешь на любой — он копируется. Вставляешь и отправляешь!',
+  cta:    'Три анализа бесплатно! Попробуй прямо сейчас — ссылка в описании!',
+};
 
 function delay(ms){ return new Promise(r => setTimeout(r, ms)); }
 
-function speak(text, rate=0.92){
+function speak(key){
   return new Promise(resolve => {
-    sub.textContent = text;
+    sub.textContent = SUBTITLES[key] || '';
     sub.classList.add('vis');
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = 'ru-RU';
-    u.rate = rate;
-    u.pitch = 1.05;
-    const ru = voices.find(v => v.lang.startsWith('ru'));
-    if(ru) u.voice = ru;
-    u.onend = resolve;
-    u.onerror = resolve;
-    synth.speak(u);
+    const audio = new Audio(AUDIO[key]);
+    audio.onended = resolve;
+    audio.onerror = ()=>{ console.warn('audio err', key); resolve(); };
+    audio.play().catch(()=>resolve());
   });
 }
 
@@ -335,19 +349,16 @@ function variant(n, text){
 async function start(){
   document.getElementById('play').remove();
 
-  // PRE-LOAD voices one more time
-  voices = synth.getVoices();
-
   /* ── SCENE 1: Hook ── */
   const hook = document.getElementById('hook');
   hook.classList.add('vis');
   await delay(300);
   document.getElementById('hl1').classList.add('vis');
-  await speak('Получил сообщение и завис?', 0.88);
-  await delay(200);
+  await speak('hook1');
+  await delay(150);
   document.getElementById('hl2').classList.add('vis');
-  await speak('Не знаешь что ответить — и это нормально.', 0.9);
-  await delay(400);
+  await speak('hook2');
+  await delay(300);
   hook.style.transition = 'opacity .7s';
   hook.classList.remove('vis');
   await delay(700);
@@ -355,25 +366,25 @@ async function start(){
   hideSub();
 
   /* ── SCENE 2: Incoming msg ── */
-  await speak('Смотри — пришло сообщение:', 0.93);
+  await speak('scene3');
   addEl(bubble('Слушай, ты как вообще?.. 🤔', 'incoming'));
-  await delay(900);
+  await delay(600);
 
-  await speak('И ты не знаешь как правильно ответить.', 0.93);
-  await delay(700);
+  await speak('scene4');
+  await delay(500);
 
   /* ── SCENE 3: Send to bot ── */
-  await speak('Просто скинь переписку нашему боту.', 0.93);
+  await speak('scene5');
   addEl(bubble('📸 [скриншот переписки]', 'outgoing'));
-  await delay(800);
+  await delay(600);
 
   /* ── SCENE 4: Bot typing + mode keyboard ── */
   const t1 = typing();
   addEl(t1);
   setTimeout(()=>t1.classList.add('vis'),50);
 
-  await speak('Бот читает и спрашивает — в каком стиле отвечать?', 0.9);
-  await delay(600);
+  await speak('scene6');
+  await delay(400);
   t1.remove();
 
   addEl(bubble('🔍 Переписка прочитана. Выбери режим ответа:', 'bot'));
@@ -384,24 +395,24 @@ async function start(){
   await delay(200);
   requestAnimationFrame(()=>setTimeout(()=>kb.classList.add('vis'),50));
 
-  await speak('Ты выбираешь — например, Флирт.', 0.93);
-  await delay(400);
+  await speak('scene7');
+  await delay(300);
 
   const flirtBtn = document.getElementById('flirt');
   if(flirtBtn) flirtBtn.classList.add('active');
-  await delay(500);
+  await delay(400);
 
   /* ── SCENE 5: Analysis ── */
   const t2 = typing();
   addEl(t2);
   setTimeout(()=>t2.classList.add('vis'),50);
 
-  await speak('Бот анализирует и выдаёт пять готовых ответов.', 0.9);
-  await delay(1400);
+  await speak('scene8');
+  await delay(800);
   t2.remove();
 
   addEl(bubble('✨ Он открыт и ждёт ответа — тёплый, слегка интригующий тон. Варианты:', 'bot'));
-  await delay(500);
+  await delay(400);
 
   const vars = [
     'Всё отлично, когда слышу тебя 😊',
@@ -412,16 +423,16 @@ async function start(){
   ];
 
   for(let i=0; i<vars.length; i++){
-    await delay(350);
+    await delay(300);
     addEl(variant(i+1, vars[i]));
   }
 
-  await speak('Нажимаешь на любой — он копируется. Отправляешь.', 0.92);
-  await delay(600);
+  await speak('scene9');
+  await delay(400);
 
   /* ── SCENE 6: CTA ── */
-  await speak('Три анализа бесплатно. Попробуй прямо сейчас.', 0.9);
-  await delay(400);
+  await speak('cta');
+  await delay(200);
   hideSub();
 
   document.getElementById('cta').classList.add('vis');
