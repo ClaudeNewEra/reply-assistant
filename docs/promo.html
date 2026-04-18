@@ -272,16 +272,16 @@ const AUDIO = {
 };
 
 const SUBTITLES = {
-  hook1:  'Получил сообщение и завис?!',
-  hook2:  'Не знаешь что ответить — слушай, я нашёл кое-что крутое.',
-  scene3: 'Смотри — приходит сообщение:',
-  scene4: 'И ты сидишь и не знаешь что написать.',
-  scene5: 'Просто скидываешь переписку в МозгПереписки AI — всё!',
-  scene6: 'Бот читает и спрашивает в каком стиле отвечать.',
-  scene7: 'Выбираешь — например, флирт!',
-  scene8: 'И бам — пять готовых ответов прямо в чате!',
-  scene9: 'Нажимаешь на любой — он копируется. Вставляешь и отправляешь!',
-  cta:    'Три анализа бесплатно! Попробуй прямо сейчас — ссылка в описании!',
+  hook1:  'Получил такое сообщение — и завис?!',
+  hook2:  'Слушай, я нашёл кое-что реально крутое — сейчас покажу!',
+  scene3: 'Смотри — тебе написали:',
+  scene4: 'И ты не знаешь что ответить...',
+  scene5: 'Просто скидываешь скрин в МозгПереписки AI — вот и всё!',
+  scene6: 'Он мгновенно читает и спрашивает в каком стиле отвечать.',
+  scene7: 'Флирт — жмёшь!',
+  scene8: 'Бам — пять убийственных ответов прямо в чате!',
+  scene9: 'Нажал — скопировал — вставил — отправил!',
+  cta:    'Три анализа бесплатно! Ссылка в описании — переходи!',
 };
 
 function delay(ms){ return new Promise(r => setTimeout(r, ms)); }
@@ -367,68 +367,71 @@ async function start(){
 
   /* ── SCENE 2: Incoming msg ── */
   await speak('scene3');
-  addEl(bubble('Слушай, ты как вообще?.. 🤔', 'incoming'));
-  await delay(600);
+  addEl(bubble('Привет... ты обо мне думал? 👀', 'incoming'));
+  await delay(400);
 
   await speak('scene4');
-  await delay(500);
+  await delay(350);
 
   /* ── SCENE 3: Send to bot ── */
   await speak('scene5');
-  addEl(bubble('📸 [скриншот переписки]', 'outgoing'));
-  await delay(600);
+  addEl(bubble('📸 переписка.jpg', 'outgoing'));
+  await delay(400);
 
   /* ── SCENE 4: Bot typing + mode keyboard ── */
   const t1 = typing();
   addEl(t1);
-  setTimeout(()=>t1.classList.add('vis'),50);
+  setTimeout(()=>t1.classList.add('vis'),30);
 
   await speak('scene6');
-  await delay(400);
+  await delay(200);
   t1.remove();
 
-  addEl(bubble('🔍 Переписка прочитана. Выбери режим ответа:', 'bot'));
-  await delay(300);
+  addEl(bubble('⚡ Готово! Она флиртует — явно. Выбери стиль:', 'bot'));
+  await delay(200);
 
   const kb = keyboard();
   addEl(kb);
-  await delay(200);
-  requestAnimationFrame(()=>setTimeout(()=>kb.classList.add('vis'),50));
+  await delay(150);
+  requestAnimationFrame(()=>setTimeout(()=>kb.classList.add('vis'),30));
 
   await speak('scene7');
-  await delay(300);
+  await delay(200);
 
   const flirtBtn = document.getElementById('flirt');
   if(flirtBtn) flirtBtn.classList.add('active');
-  await delay(400);
+  await delay(300);
 
   /* ── SCENE 5: Analysis ── */
   const t2 = typing();
   addEl(t2);
-  setTimeout(()=>t2.classList.add('vis'),50);
+  setTimeout(()=>t2.classList.add('vis'),30);
 
   await speak('scene8');
-  await delay(800);
+  await delay(500);
   t2.remove();
 
-  addEl(bubble('✨ Он открыт и ждёт ответа — тёплый, слегка интригующий тон. Варианты:', 'bot'));
-  await delay(400);
+  addEl(bubble('🔥 Вот 5 ответов — выбирай лучший:', 'bot'));
+  await delay(200);
 
   const vars = [
-    'Всё отлично, когда слышу тебя 😊',
-    'Лучше, чем раньше — и это благодаря тебе 🌸',
-    'Кажется, ждал твоего вопроса 😏',
-    'Расскажи сначала про себя, тогда скажу 😉',
-    'Зависит от того, что именно интересует 🔥'
+    ['Думал. Прямо сейчас 😏', '#a78bfa'],
+    ['Если честно — да 🙈', '#6C63FF'],
+    ['А ты ждала этого? 🔥', '#a78bfa'],
+    ['Что ты со мной делаешь... 💜', '#6C63FF'],
+    ['Угадай 😈', '#a78bfa'],
   ];
 
   for(let i=0; i<vars.length; i++){
-    await delay(300);
-    addEl(variant(i+1, vars[i]));
+    await delay(220);
+    const el = document.createElement('div');
+    el.className = 'variant';
+    el.innerHTML = `<span class="vnum" style="color:${vars[i][1]}">${i+1}.</span>${vars[i][0]}`;
+    addEl(el);
   }
 
   await speak('scene9');
-  await delay(400);
+  await delay(300);
 
   /* ── SCENE 6: CTA ── */
   await speak('cta');
