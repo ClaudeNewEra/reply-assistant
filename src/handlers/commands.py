@@ -43,7 +43,7 @@ async def cmd_start(message: Message, bot: Bot):
         footer = "Бесплатные анализы закончились. /buy — купи пакет."
 
     await message.answer(
-        "🧠 МозгПереписки — AI читает между строк и пишет ответы за тебя.\n\n"
+        "🧠 МозгПереписки AI — читает между строк и пишет ответы за тебя.\n\n"
         "Скинь мне:\n"
         "📝 Текст переписки — скопируй диалог\n"
         "📸 Скриншот чата — любой мессенджер\n"
@@ -59,7 +59,7 @@ async def cmd_start(message: Message, bot: Bot):
 @router.message(Command("help"))
 async def cmd_help(message: Message):
     await message.answer(
-        "🧠 МозгПереписки — как пользоваться\n\n"
+        "🧠 МозгПереписки AI — как пользоваться\n\n"
         "1. Отправь переписку — текст, скрин или голосовое\n"
         "2. Выбери режим: флирт, юмор, дружба, любовь, деловой\n"
         "3. Получи анализ + 5 готовых ответов\n"
@@ -122,7 +122,7 @@ async def cmd_buy(message: Message, bot: Bot):
         await bot.send_invoice(
             chat_id=message.chat.id,
             title=f"{label} — {hint}",
-            description="МозгПереписки — AI анализы переписки с выбором режима",
+            description="МозгПереписки AI — анализы переписки с выбором режима",
             payload=payload,
             currency="XTR",
             prices=[LabeledPrice(label=label, amount=stars)]
